@@ -77,6 +77,7 @@ public:
     SlVector3 trace(const Ray &ray, double t0, double t1) const;
     SlVector3 shade(const HitRecord &hr) const;
     void writeImage(const std::string &fname);
+    void traceTask(uint32_t i, uint32_t j, uint32_t samples, SlVector3* pixel);
 
     bool color;
     int samples;

@@ -3,11 +3,13 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <vector>
 #include <getopt.h>
+#include <span>
 #include "tbb/blocked_range.h"
 #include "tbb/blocked_range2d.h"
 #include "tbb/parallel_for.h"
-#include "tbb/task_scheduler_observer.h"
+/* #include "BVH.h" */
 
 #ifdef __APPLE__
 #define MAX std::numeric_limits<double>::max()
@@ -17,24 +19,6 @@
 #endif
 
 
-//////////////////////////////////////////////////////////////
-/// Custom Tbb Executor For Rendering
-
-struct RenderTask
-{
-
-}
-
-struct RenderExecutor
-{
-
-
-    std::vector<RenderTask> tasks;
-}
-
-
-
-//////////////////////////////////////////////////////////////
 
 // return the determinant of the matrix with columns a, b, c.
 double det(const SlVector3 &a, const SlVector3 &b, const SlVector3 &c) {
@@ -362,7 +346,7 @@ SlVector3 Tracer::trace(const Ray &r, double t0, double t1) const {
 
 
 void Tracer::traceImage() {
-    // set up coordinate system
+    /* // set up coordinate system */
     SlVector3 w = eye - at;
     w /= mag(w);
     SlVector3 u = cross(up,w);
@@ -377,31 +361,34 @@ void Tracer::traceImage() {
     double b = h;
     double t = -h;
 
-    SlVector3 *pixel = im;
 
-    for (unsigned int j=0; j<res[1]; j++) {
-        for (unsigned int i=0; i<res[0]; i++, pixel++) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, res[1]), [&](tbb::blocked_range<size_t> rng) 
+                      {
+                            SlVector3 *pixel = im + rng.begin() * res[0];
+                            for(size_t j = rng.begin(); j != rng.end(); ++j)
+                            {
+                              for (unsigned int i=0; i<res[0]; i++, pixel++) {
+                                  SlVector3 result(0.0,0.0,0.0);
+                                  for (int k = 0; k < samples; k++) {
 
-            SlVector3 result(0.0,0.0,0.0);
+                                      double rx = 1.1 * rand() / RAND_MAX;
+                                      double ry = 1.1 * rand() / RAND_MAX;
 
-            for (int k = 0; k < samples; k++) {
+                                      double x = l + (r-l)*(i+rx)/res[0];
+                                      double y = b + (t-b)*(j+ry)/res[1];
+                                      SlVector3 dir = -d * w + x * u + y * v;
 
-                double rx = 1.1 * rand() / RAND_MAX;
-                double ry = 1.1 * rand() / RAND_MAX;
+                                      Ray r(eye, dir);
+                                      normalize(r.d);
 
-                double x = l + (r-l)*(i+rx)/res[0];
-                double y = b + (t-b)*(j+ry)/res[1];
-                SlVector3 dir = -d * w + x * u + y * v;
-	
-                Ray r(eye, dir);
-                normalize(r.d);
+                                      result += trace(r, hither, MAX);
 
-                result += trace(r, hither, MAX);
-
-            }
-            (*pixel) = result / samples;
-        }
-    }
+                                  }
+                                  (*pixel) = result / samples;
+                              }
+                          }
+                      }
+                  );
 }
 
 void Tracer::writeImage(const std::string &fname) {
@@ -426,6 +413,7 @@ void Tracer::writeImage(const std::string &fname) {
 
 
 int main(int argc, char *argv[]) {
+
     int c;
     double aperture = 0.0;
     int samples = 1;
@@ -452,15 +440,18 @@ int main(int argc, char *argv[]) {
 
     if (argc-optind != 2) {
         std::cout<<"usage: trace [opts] input.nff output.ppm"<<std::endl;
-        for (unsigned int i=0; i<argc; i++) std::cout<<argv[i]<<std::endl;
+        for (int i=0; i < argc; i++) std::cout<<argv[i]<<std::endl;
         exit(0);
     }	
 
-    Tracer tracer(argv[optind++]);
-    tracer.aperture = aperture;
-    tracer.samples = samples;
-    tracer.color = color;
-    tracer.maxraydepth = maxraydepth;
-    tracer.traceImage();
-    tracer.writeImage(argv[optind++]);
+    Tracer *tracer = nullptr;
+    tracer = new Tracer(argv[optind++]);
+    tracer->aperture = aperture;
+    tracer->samples = samples;
+    tracer->color = color;
+    tracer->maxraydepth = maxraydepth;
+    tracer->traceImage();
+    tracer->writeImage(argv[optind++]);
+
+    delete tracer;
 };

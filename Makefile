@@ -1,5 +1,5 @@
 CC = c++
-FLAGS = -Wall -std=c++20
+FLAGS = -Wall -std=c++20 -ltbb
 
 #-----------------------------------------
 #Optimization ----------------------------
@@ -13,8 +13,8 @@ OBJECTS = trace.o slVector.o
 
 #-----------------------------------------
 # 
-INCS =
-LIBS =
+INCS = 
+LIBS = 
 
 CCOPTS = $(OPT) $(FLAGS) $(INCS)  
 LDOPTS = $(OPT) $(LIBS)
@@ -36,7 +36,7 @@ trace: $(OBJECTS) trace.H
 
 #-----------------------------------------
 
-trace.o: trace.cpp trace.H slIO.H slVector.H
+trace.o: trace.cpp trace.H slIO.H slVector.H 
 
 .cpp.o: 
 	$(CC) $(CCOPTS) -c $< -o $@
