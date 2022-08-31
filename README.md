@@ -10,10 +10,9 @@
     - :hammer: acceleration using BVH (in progress)
 
 ## Some demonstration photo so far (without the in progress functionality)
+- The folowing results uses sample = 16 for now
 ![Teapot](./result/teapot.png)
 ![Balls](./result/balls.png)
 ![Gears](./result/gears.png)
-
-
-
-
+![Mount](./result/mount.png)
+![Rings](./result/rings.png)

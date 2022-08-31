@@ -31,9 +31,32 @@ public:
     SlVector3 p, c;
 };
 
+struct AABB
+{
+public:
+    SlVector3 boundMin;
+    SlVector3 boundMax;
+
+    AABB() : boundMin(std::numeric_limits<double>::max()), boundMax(std::numeric_limits<double>::lowest())
+    {
+
+    }
+
+    AABB(const SlVector3& _min, const SlVector3& _max) : boundMin(_min), boundMax(_max)
+    {
+
+    }
+
+    SlVector3 extent() const
+    {
+        return boundMax - boundMin;
+    }
+}
+
 class Surface {
 public:
     virtual bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const = 0;
+    virtual AABB buildAABB() const = 0;
     virtual ~Surface() {};
 };
 
@@ -41,7 +64,22 @@ class Triangle : public Surface {
     SlVector3 a,b,c;
 public:
     Triangle(const SlVector3 &_a, const SlVector3 &_b, const SlVector3 &_c) : a(_a), b(_b), c(_c) {};
-    virtual bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const;
+    virtual bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const override;
+
+    inline virtual AABB buildAABB() const override
+    {
+        SlVector3 boundMin(std::numeric_limits<double>::lowest());
+        SlVector3 boundMax(std::numeric_limits<double>::max());
+
+        boundMin.minSet(a);
+        boundMin.minSet(b);
+        boundMin.minSet(c);
+
+        boundMax.maxSet(a);
+        boundMax.maxSet(b);
+        boundMax.maxSet(c);
+        return AABB{boundMax, boundMax};
+    }
 };
 
 class TrianglePatch : public Triangle {
@@ -58,7 +96,18 @@ class Sphere : public Surface {
     double rad;
 public:
     Sphere(const SlVector3 &_c, double _r) : c(_c), rad(_r) {};
-    bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const;
+    bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const override;
+
+    inline virtual AABB buildAABB() const override
+    {
+        SlVector3 boundMin(std::numeric_limits<double>::max());
+        SlVector3 boundMax(std::numeric_limits<double>::lowest());
+
+        boundMin.minSet(c - SlVector3{rad, rad, rad});
+        boundMax.maxSet(c + SlVector3{rad, rad, rad});
+
+        return AABB{boundMax, boundMax};
+    }
 };
 
 class Tracer {
