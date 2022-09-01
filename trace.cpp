@@ -9,7 +9,7 @@
 #include "tbb/blocked_range.h"
 #include "tbb/blocked_range2d.h"
 #include "tbb/parallel_for.h"
-/* #include "BVH.h" */
+#include "BVH.h"
 
 #ifdef __APPLE__
 #define MAX std::numeric_limits<double>::max()
@@ -18,6 +18,7 @@
 #define MAX DBL_MAX
 #endif
 
+BVH *bvh = nullptr;
 
 
 // return the determinant of the matrix with columns a, b, c.
@@ -261,8 +262,8 @@ Tracer::~Tracer() {
 SlVector3 Tracer::shade(const HitRecord &hr) const {
     if (color) return hr.f.color;
 
-    SlVector3 color(0.0);
     HitRecord dummy;
+    SlVector3 color(0.0);
 
     constexpr auto epsilon = 0.00001;
 
@@ -273,19 +274,12 @@ SlVector3 Tracer::shade(const HitRecord &hr) const {
         auto lightDirection = light.p - hr.p;
         normalize(lightDirection);
 
-        Ray shadowRay(hr.p, lightDirection);
+        Ray shadowRay(hr.p + epsilon * lightDirection, lightDirection);
 
         // This part assumes that we are always far away from the objects
-        for(auto& [geometry, f] : surfaces)
+        if(bvh->intersect(shadowRay, 0, std::numeric_limits<double>::max(), dummy))
         {
-            if(geometry->intersect(shadowRay, epsilon, std::numeric_limits<double>::max(), dummy))
-            {
-                if(l2Norm(hr.p - eye) > dummy.t)
-                {
-                    shadow = true;
-                    break;
-                }
-            }
+            shadow = l2Norm(hr.p - eye) > dummy.t;
         }
 
         if (!shadow) {
@@ -321,24 +315,8 @@ SlVector3 Tracer::trace(const Ray &r, double t0, double t1) const {
     SlVector3 color(bcolor);
   
     bool hit = false;
-    double minHitDistance = std::numeric_limits<double>::max();
 
-    HitRecord temp;
-
-    // Search for all objects for ray hits
-    for(auto& [geometry, f] : surfaces)
-    {
-        if(geometry->intersect(r, t0, t1, temp))
-        {
-            if(temp.t < minHitDistance)
-            {
-                minHitDistance = temp.t;
-                hr = temp;
-                hr.f = f;
-                hit = true;
-            }
-        }
-    }
+    hit = bvh->intersect(r, t0, t1, hr);
 
     if (hit) color = shade(hr);
     return color;
@@ -361,14 +339,16 @@ void Tracer::traceImage() {
     double b = h;
     double t = -h;
 
+    bvh = new BVH();
+    bvh->buildBVH(&surfaces);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, res[1]), [&](tbb::blocked_range<size_t> rng) 
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, res[1]), 
+                      [&](tbb::blocked_range<size_t> rng) 
                       {
                             SlVector3 *pixel = im + rng.begin() * res[0];
                             for(size_t j = rng.begin(); j != rng.end(); ++j)
                             {
-                              for (unsigned int i=0; i<res[0]; i++, pixel++) {
-                                  SlVector3 result(0.0,0.0,0.0);
+                              for (unsigned int i=0; i<res[0]; i++, pixel++) { SlVector3 result(0.0,0.0,0.0);
                                   for (int k = 0; k < samples; k++) {
 
                                       double rx = 1.1 * rand() / RAND_MAX;
@@ -454,4 +434,5 @@ int main(int argc, char *argv[]) {
     tracer->writeImage(argv[optind++]);
 
     delete tracer;
+    delete bvh;
 };

@@ -20,7 +20,7 @@ public:
 
 class HitRecord {
 public:
-    double t, alpha, beta, gamma;
+    double t = std::numeric_limits<double>::max(), alpha, beta, gamma;
     SlVector3 p, n, v;
     Fill f;
     int raydepth;
@@ -47,16 +47,52 @@ public:
 
     }
 
+    bool intersect(const Ray& r) const
+    {
+        double tmin = std::numeric_limits<double>::lowest();
+        double tmax = std::numeric_limits<double>::max();
+        if(r.d.x() != 0.0)
+        {
+
+            double tx1 = (boundMin.x() - r.e.x()) / r.d.x();
+            double tx2 = (boundMax.x() - r.e.x()) / r.d.x();
+            tmin = std::max(tmin, std::min(tx1, tx2));
+            tmax = std::min(tmax, std::max(tx1, tx2));
+        }
+
+        if(r.d.y() != 0.0)
+        {
+            double ty1 = (boundMin.y() - r.e.y()) / r.d.y();
+            double ty2 = (boundMax.y() - r.e.y()) / r.d.y();
+
+            tmin = std::max(tmin, std::min(ty1, ty2));
+            tmax = std::min(tmax, std::max(ty1, ty2));
+        }
+        
+        if(r.d.z() != 0.0)
+        {
+            double tz1 = (boundMin.z() - r.e.z()) / r.d.z();
+            double tz2 = (boundMax.z() - r.e.z()) / r.d.z();
+
+            tmin = std::max(tmin, std::min(tz1, tz2));
+            tmax = std::min(tmax, std::max(tz1, tz2));
+        }
+
+
+        return tmin <= tmax;  
+    }
+
     SlVector3 extent() const
     {
         return boundMax - boundMin;
     }
-}
+};
 
 class Surface {
 public:
     virtual bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const = 0;
     virtual AABB buildAABB() const = 0;
+    virtual SlVector3 centroid() const = 0;
     virtual ~Surface() {};
 };
 
@@ -68,8 +104,8 @@ public:
 
     inline virtual AABB buildAABB() const override
     {
-        SlVector3 boundMin(std::numeric_limits<double>::lowest());
-        SlVector3 boundMax(std::numeric_limits<double>::max());
+        SlVector3 boundMin(std::numeric_limits<double>::max());
+        SlVector3 boundMax(std::numeric_limits<double>::lowest());
 
         boundMin.minSet(a);
         boundMin.minSet(b);
@@ -78,7 +114,12 @@ public:
         boundMax.maxSet(a);
         boundMax.maxSet(b);
         boundMax.maxSet(c);
-        return AABB{boundMax, boundMax};
+        return AABB{boundMin, boundMax};
+    }
+
+    inline virtual SlVector3 centroid() const override
+    {
+        return (a + b + c) / 3.0;
     }
 };
 
@@ -88,7 +129,7 @@ public:
     TrianglePatch(const SlVector3 &_a, const SlVector3 &_b, const SlVector3 &_c,
     const SlVector3 &_n1, const SlVector3 &_n2, const SlVector3 &_n3) 
         : Triangle(_a,_b,_c), n1(_n1), n2(_n2), n3(_n3) {};
-    virtual bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const;
+    virtual bool intersect(const Ray &r, double t0, double t1, HitRecord &hr) const override;
 };
 
 class Sphere : public Surface {
@@ -107,6 +148,11 @@ public:
         boundMax.maxSet(c + SlVector3{rad, rad, rad});
 
         return AABB{boundMax, boundMax};
+    }
+
+    inline virtual SlVector3 centroid() const override
+    {
+        return c;
     }
 };
 

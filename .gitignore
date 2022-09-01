@@ -32,3 +32,4 @@
 *.app
 .ycm_*
 trace
+.idea/
