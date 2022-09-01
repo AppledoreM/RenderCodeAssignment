@@ -67,7 +67,7 @@ bool Triangle::intersect(const Ray &r, double t0, double t1, HitRecord &hr) cons
     auto n3 = cross(a - c, b - c);
     normalize(n3);
 
-    hr.n = hr.alpha * n1 + hr.beta * n2 + hr.gamma * n3;
+    hr.n = n1 + n2 + n3;
     normalize(hr.n);
 
     return true;
@@ -265,7 +265,7 @@ SlVector3 Tracer::shade(const HitRecord &hr) const {
     HitRecord dummy;
     SlVector3 color(0.0);
 
-    constexpr auto epsilon = 0.00001;
+    constexpr auto epsilon = 1e-6;
 
     for (unsigned int i=0; i<lights.size(); i++) {
         const Light &light = lights[i];
@@ -296,13 +296,26 @@ SlVector3 Tracer::shade(const HitRecord &hr) const {
             // Calculate diffuse color
             auto diffuse = hr.f.kd * light.c * hr.f.color * std::max(dot(inVec, hr.n), 0.0);
             // Calculate specular color
-            auto specular = hr.f.ks * light.c * std::pow(std::max(0.0, dot(reflectVec, viewVec)), hr.f.shine);
+            auto specular = hr.f.ks * light.c * hr.f.color * std::pow(std::max(0.0, dot(reflectVec, viewVec)), hr.f.shine);
             color += diffuse + specular;
         }
     }
 
-    // Step 4 Add code for computing reflection color here
+    dummy = {};
+    dummy.t = std::numeric_limits<double>::max();
+    if(dummy.raydepth < maxraydepth)
+    {
+        auto reflectRayDirection = -hr.v + 2 * dot(hr.v, hr.n) * hr.n;
+        normalize(reflectRayDirection);
 
+        Ray reflectRay(hr.p + epsilon * reflectRayDirection, reflectRayDirection);
+
+        if(dot(reflectRayDirection, hr.n) > 0 && bvh->intersect(reflectRay, 0, std::numeric_limits<double>::max(), dummy))
+        {
+            dummy.raydepth = hr.raydepth + 1;
+            color += hr.f.ks * hr.f.color * shade(dummy);
+        }
+    }
     
 
     // Step 5 Add code for computing refraction color here
@@ -312,6 +325,7 @@ SlVector3 Tracer::shade(const HitRecord &hr) const {
 
 SlVector3 Tracer::trace(const Ray &r, double t0, double t1) const {
     HitRecord hr;
+    hr.raydepth = 0;
     SlVector3 color(bcolor);
   
     bool hit = false;
@@ -348,7 +362,8 @@ void Tracer::traceImage() {
                             SlVector3 *pixel = im + rng.begin() * res[0];
                             for(size_t j = rng.begin(); j != rng.end(); ++j)
                             {
-                              for (unsigned int i=0; i<res[0]; i++, pixel++) { SlVector3 result(0.0,0.0,0.0);
+                              for (unsigned int i=0; i<res[0]; i++, pixel++) { 
+                                  SlVector3 result(0.0,0.0,0.0);
                                   for (int k = 0; k < samples; k++) {
 
                                       double rx = 1.1 * rand() / RAND_MAX;

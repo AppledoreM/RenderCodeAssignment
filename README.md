@@ -7,7 +7,7 @@
     - phong shading model
     - multithreading with tbb
     - acceleration using BVH
-    - reflection (in progress)
+    - reflection
     - refraction (in progress)
     
 ## Requirements
